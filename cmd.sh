@@ -1,6 +1,6 @@
 python run_bert_softmax.py \
---dataset msra --do_train \
---batch_size 64 \
+--dataset msra --do_train --max_train_epochs 30 \
+--batch_size 32 \
 --ptm_dir ../bert-base-chinese \
 --train_max_len 128 \
 --device cuda \

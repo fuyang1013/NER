@@ -1,5 +1,6 @@
 from cProfile import label
 import json
+from sympy import N
 import torch
 from torch.utils.data import (
     TensorDataset, RandomSampler, SequentialSampler, DataLoader)
@@ -44,13 +45,13 @@ def read_ner_json_file(infile, label2id, max_seq_len, debug):
                 if e > actual_max_seq_len or 'B-' + l not in label2id:
                     continue
                     
-                    if e - s == 1:
-                        label_seq[s] = 'S-' + l
-                    else:
-                        label_seq[s] = 'B-' + l
-                        label_seq[e-1] = 'S-' + l
-                        for i in range(s+1, e-1):
-                            label_seq[i] = 'M-' + l
+                if e - s == 1:
+                    label_list[s] = 'S-' + l
+                else:
+                    label_list[s] = 'B-' + l
+                    label_list[e-1] = 'S-' + l
+                    for i in range(s+1, e-1):
+                        label_list[i] = 'M-' + l
             label_lists.append(label_list)
 
             # when debug, return 100 lines

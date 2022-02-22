@@ -94,39 +94,6 @@ def eval(model, eval_dataloader, device, args):
     return eval_f1, avg_loss
 
 
-def train_one_epoch(model, optimizer, train_dataloader, device, args):
-    model.train()
-    for batch_id, batch in enumerate(train_dataloader):
-        optimizer.zero_grad()
-        input_ids, attention_masks, label_ids = tuple(t.to(device) for t in batch)
-        token_type_ids = torch.zeros_like(input_ids, dtype=torch.long, device=device)  # torch.IntTensor()
-        position_ids = torch.arange(
-            args.train_max_len, 
-            device=device, 
-            dtype=torch.long
-        ).unsqueeze(dim=0).repeat([input_ids.size(0), 1])
-        _, loss = model(
-            input_ids, attention_masks, token_type_ids, position_ids, label_ids)
-        loss.backward()
-        optimizer.step()
-
-        if (batch_id+1) % args.display_steps == 0 or (batch_id+1) == len(train_dataloader):
-            if args.separate_lr:
-                msg = 'steps={}, loss={:.7f}, lr=[{}, {}]'
-                logger.info(msg.format(
-                    batch_id+1,
-                    loss.item(),
-                    optimizer.param_groups[0]['lr'],
-                    optimizer.param_groups[1]['lr']
-                ))
-            else:
-                msg = 'steps={}, loss={:.7f}, lr={}'
-                logger.info(msg.format(
-                    batch_id+1,
-                    loss.item(),
-                    args.ptm_lr
-                ))
-
 def handle_train(model, args, tokenizer):
     """
     train_epoch + eval
@@ -168,13 +135,38 @@ def handle_train(model, args, tokenizer):
     logger.info('start to train...')
     for epoch in range(args.max_train_epochs):
         logger.info(f'epoch={epoch}')
-        train_one_epoch(
-            model, 
-            optimizer, 
-            train_dataloader, 
-            device, 
-            args
-        )
+        model.train()
+        for batch_id, batch in enumerate(train_dataloader):
+            optimizer.zero_grad()
+            input_ids, attention_masks, label_ids = tuple(t.to(device) for t in batch)
+            token_type_ids = torch.zeros_like(input_ids, dtype=torch.long, device=device)  # torch.IntTensor()
+            position_ids = torch.arange(
+                args.train_max_len, 
+                device=device, 
+                dtype=torch.long
+            ).unsqueeze(dim=0).repeat([input_ids.size(0), 1])
+            _, loss = model(
+                input_ids, attention_masks, token_type_ids, position_ids, label_ids)
+            loss.backward()
+            optimizer.step()
+
+            if (batch_id+1) % args.display_steps == 0 or (batch_id+1) == len(train_dataloader):
+                if args.separate_lr:
+                    msg = 'steps={}, loss={:.7f}, lr=[{}, {}]'
+                    logger.info(msg.format(
+                        batch_id+1,
+                        loss.item(),
+                        optimizer.param_groups[0]['lr'],
+                        optimizer.param_groups[1]['lr']
+                    ))
+                else:
+                    msg = 'steps={}, loss={:.7f}, lr={}'
+                    logger.info(msg.format(
+                        batch_id+1,
+                        loss.item(),
+                        args.ptm_lr
+                    ))
+
         eval_f1, avg_loss = eval(model, eval_dataloader, device, args)
         logger.info(f'evaluation result: F1={eval_f1:.2f}%, avg loss={avg_loss:.7f}')
         

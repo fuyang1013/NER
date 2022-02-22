@@ -27,6 +27,7 @@ if __name__ == '__main__':
     parser.add_argument('--do_eval', action='store_true')
     parser.add_argument('--do_predict', action='store_true')
     parser.add_argument('--device', type=str, choices=['cpu', 'cuda'])
+    parser.add_argument('--seed', type=int, default=42)
 
     parser.add_argument('--max_train_epochs', default=10, type=int)
     parser.add_argument('--display_steps', default=100, type=int)
@@ -47,6 +48,8 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
 
     arguments = parser.parse_args()
+
+    set_seed(arguments.seed)
     
     # load dataset metadata
     if arguments.do_train or arguments.do_eval:
