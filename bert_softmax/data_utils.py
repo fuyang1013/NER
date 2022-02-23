@@ -1,9 +1,8 @@
-from cProfile import label
 import json
-from sympy import N
 import torch
 from torch.utils.data import (
     TensorDataset, RandomSampler, SequentialSampler, DataLoader)
+from log import logger
 
 
 def proc_text(text):
@@ -25,6 +24,7 @@ def proc_text(text):
 def read_ner_json_file(infile, label2id, max_seq_len, debug):
     actual_max_seq_len = max_seq_len - 2  # reserve for `[CLS]` and `[SEP]`
     token_lists, label_lists = [], []
+    uncovered_labels = set()
     with open(infile) as fin:
         for line in fin:
             line_json = json.loads(line.rstrip())
@@ -39,6 +39,8 @@ def read_ner_json_file(infile, label2id, max_seq_len, debug):
             label_list = ['O']*len(token_list)
             for span in line_json['ents']:
                 s, e, l = span[0], span[1], span[2]
+                if 'B-' + l not in label2id:
+                    uncovered_labels.add(l)
                 # detail:
                 ## 1. abandon entity which is corrupted during text truncation
                 ## 2. ignore annotated entity whose label is not in `tag2id`
@@ -59,6 +61,7 @@ def read_ner_json_file(infile, label2id, max_seq_len, debug):
                 break
     
     assert len(token_lists) == len(label_lists)
+    logger.info(f'{infile} uncovered labels:{uncovered_labels}')
     return token_lists, label_lists
 
 

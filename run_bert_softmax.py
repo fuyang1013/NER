@@ -77,6 +77,7 @@ if __name__ == '__main__':
     model = BertSoftmax(len(arguments.labels), bert)
     if arguments.checkpoint is None:
         bert = BertModel.from_pretrained(arguments.ptm_dir)
+        model.ptm_model = bert  # !!!
     else:
         model.load_state_dict(torch.load(arguments.checkpoint))
     
