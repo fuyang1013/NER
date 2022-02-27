@@ -402,25 +402,26 @@ def test_bert_pretrain():
 
     model = BertForPreTraining.from_pretrained('../bert-base-chinese')
     # model = BertForPreTraining(config=config)
-    for k, v in model.named_parameters():
-        print(k, v.size())
-    assert 0
+    # for k, v in model.named_parameters():
+    #     print(k, v.size())
+    # assert 0
 
 
     tokenizer = BertTokenizerFast.from_pretrained('../bert-base-chinese')
     model.eval()
     # print(model.cls.predictions.transform.dense)
-    text = '为了避免工作猝死，我们最好不要卷。'
-    res = tokenizer.batch_encode_plus([text])
-    
+    # text = '我喜欢你。'
+    res = tokenizer.batch_encode_plus(['打 的 新 冠 [MASK] [MASK] 第 1 针 ，'])
+    print(res)
+
     input_ids = res['input_ids']
     input_ids = torch.LongTensor(input_ids)
-    mask_word = '卷。'
-    start = text.index(mask_word)
-    for i in range(start+1, start+1+len(mask_word)):
-        input_ids[0, i] = 103
+    # mask_word = '卷。'
+    # start = text.index(mask_word)
+    # for i in range(start+1, start+1+len(mask_word)):
+    #     input_ids[0, i] = 103
     
-    print('input:', tokenizer.decode(input_ids[0]))
+    # print('input:', tokenizer.decode(input_ids[0]))
 
     # input_ids = torch.LongTensor([[101, 704, 1744, 4638, 7674, 6963, 3221, 1266, 776, 102]])
     token_type_ids = torch.LongTensor(res['token_type_ids'])
@@ -428,12 +429,17 @@ def test_bert_pretrain():
     position_ids = torch.arange(input_ids.size(1), dtype=torch.long).reshape(
         [1, input_ids.size(1)]).repeat([input_ids.size(0), 1])
     
-    print(position_ids.size())
+    # print(position_ids.size())
 
-    f = lambda x: tokenizer.decode(result['prediction_logits'][0][x].argmax())
     with torch.no_grad():
-        result = model(input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, position_ids=position_ids)
-        print('output:', tokenizer.decode(result['prediction_logits'][0].argmax(dim=-1)[1:-1]))
+        result = model(
+            input_ids, 
+            attention_mask=attention_mask, 
+            token_type_ids=token_type_ids, 
+            position_ids=position_ids
+        )
+        print('output:', tokenizer.decode(result['prediction_logits'][0][5].argmax(dim=-1)))
+        print('output:', tokenizer.decode(result['prediction_logits'][0][6].argmax(dim=-1)))
 
     # modell = BertPretrainModel(BertParam())
     # modell.load_params(model)
