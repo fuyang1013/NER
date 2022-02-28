@@ -4,7 +4,7 @@ import datetime
 import torch
 
 from log import logger
-from bert_softmax.data_utils import get_dataloader
+from bert_globalpointer.data_utils import get_dataloader
 
 
 def prepare_optimizer(model, args):
@@ -22,34 +22,6 @@ def prepare_optimizer(model, args):
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=args.ptm_lr)
     return optimizer
-
-
-def decode_ent_spans_from_tag_seq(tag_seq):
-    """
-    decode entity spans from tag sequence(currently only `BMES`)
-
-    return:
-        ent_spans(List[Tuple[int, int, str]]): list of entity spans: (start, e, label)
-    """
-
-    ent_spans = []
-    i = 0
-    start, label = None, None
-    while i < len(tag_seq):
-        if tag_seq[i].startswith('B-'):
-            start, label = i, tag_seq[i][2:]
-        elif tag_seq[i].startswith('M-') and tag_seq[i][2:] == label:
-            pass
-        elif tag_seq[i].startswith('E-') and tag_seq[i][2:] == label:
-            if start is None:
-                ent_spans.append((start, i+1, label))
-            start, label = None, None
-        elif tag_seq[i].startswith('S-'):
-            ent_spans.append((i, i+1, tag_seq[i][2:]))
-        else:
-            start, label = None, None
-        i += 1
-    return ent_spans
 
 
 def eval(model, eval_dataloader, device, args):
@@ -71,50 +43,35 @@ def eval(model, eval_dataloader, device, args):
             token_logits, loss = model(
                 input_ids, attention_masks, token_type_ids, position_ids, label_ids)
             total_loss += loss.item()
-            ner_preds = token_logits.argmax(dim=-1)
+            ner_preds = token_logits.gt(0)
             
-            ner_preds = ner_preds.tolist()
-            label_ids = label_ids.tolist()
-            masks = attention_masks.tolist()
-            for pred_ids, true_ids, masks in zip(ner_preds, label_ids, attention_masks):
-                length = sum(masks)
-                pred_tags = [args.id2label[idx] for idx in pred_ids[:length]]
-                true_tags = [args.id2label[idx] for idx in true_ids[:length]]
-                pred_spans = decode_ent_spans_from_tag_seq(pred_tags)
-                true_spans = decode_ent_spans_from_tag_seq(true_tags)
+            num_heads = ner_preds.size(1)
+            for head in range(num_heads):
+                num_tp += torch.eq(ner_preds[:, head]+1, label_ids).sum().item()
+            num_preds += ner_preds.sum().item()
+            num_truth += label_ids.sum().item()
 
-                # update num_tp, num_preds, num_truth
-                pred_spans, true_spans = set(pred_spans), set(true_spans)
-                num_tp += len(pred_spans.intersection(true_spans))
-                num_preds += len(pred_spans)
-                num_truth += len(true_spans)
     eval_f1 = 200 * num_tp / (num_preds + num_truth + 1e-12)
     avg_loss = total_loss / len(eval_dataloader)
     return eval_f1, avg_loss
 
 
 def handle_train(model, args, tokenizer):
-    """
-    train_epoch + eval
-    
-    params:
-        args: argumentparser
-    """
-
     device = torch.device(args.device)
     model.to(device)
     optimizer = prepare_optimizer(model, args)
 
     logger.info('load corpus...')
     train_dataloader = get_dataloader(
-        args.train_file, 
-        tokenizer, 
+        args.train_file,
+        tokenizer,
         args.batch_size,
-        'random', 
-        args.train_max_len, 
-        args.label2id, 
+        'random',
+        args.train_max_len,
+        args.label2id,
         args.debug
     )
+
     eval_dataloader = get_dataloader(
         args.eval_file,
         tokenizer,
@@ -124,12 +81,6 @@ def handle_train(model, args, tokenizer):
         args.label2id,
         args.debug
     )
-
-    if len(train_dataloader) <= 0 or len(eval_dataloader) <= 0:
-        raise ValueError('empty train file or eval_file')
-    logger.info(f'train/eval dataloader: {len(train_dataloader)}/{len(eval_dataloader)}')
-    if not os.path.exists('save'):
-        os.mkdir('save')
 
     logger.info('start to train...')
     for epoch in range(args.max_train_epochs):
@@ -168,11 +119,11 @@ def handle_train(model, args, tokenizer):
 
         eval_f1, avg_loss = eval(model, eval_dataloader, device, args)
         logger.info(f'evaluation result: F1={eval_f1:.2f}%, avg loss={avg_loss:.7f}')
-        
         if args.save_model:
-            dump_dir = os.path.join('save', args.save_model_name + f'_f1_{eval_f1:.2f}')
+            dump_dir = os.path.join('save', args.save_model_name + f'_epoch_{epoch}_f1_{eval_f1:.2f}')
             if not os.path.exists(dump_dir):
                 os.mkdir(dump_dir)
             dump_model_file = os.path.join(dump_dir, 'model.pt')
             torch.save(model.state_dict(), dump_model_file)
             logger.info(f'"{dump_model_file}" dumped!')
+    

@@ -75,7 +75,7 @@ class GlobalPointer(torch.nn.Module):
         logits = torch.mul(qw, kw).sum(dim=-1)  # [B, heads, L(qw), L(kw)]
 
         """ exclude padding """
-        mask = torch.abs(mask - 1)  # reverse
+        mask = torch.abs(mask - 1).bool()  # reverse
         logits = torch.masked_fill(logits, mask.unsqueeze(dim=1).unsqueeze(dim=-1), -1e12)
         logits = torch.masked_fill(logits, mask.unsqueeze(dim=1).unsqueeze(dim=1), -1e12)
 
@@ -83,3 +83,32 @@ class GlobalPointer(torch.nn.Module):
         triu_mask = torch.triu(torch.ones_like(logits)).to(inputs.device)
         logits = logits - (1 - triu_mask) * 1e12
         return logits.true_divide(self.head_size ** 0.5)
+
+
+class GlobalPointerLoss(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+    
+    def forward(self, y_pred, y_true):
+        """
+        params:
+            y_pred: [batch_size, heads, max_seq_len**2]
+            y_true: the same shape as y_pred
+        """
+
+        batch_size, heads, max_len = y_pred.size()[:3]
+        y_pred = y_pred.reshape(batch_size*heads, max_len**2)
+        y_true = y_true.reshape(batch_size*heads, max_len**2)
+
+        # multi-label categorical crossentropy
+        y_pred = (1 - 2*y_true) * y_pred
+        y_pred_neg = y_pred - y_true * 1e12
+        y_pred_pos = y_pred - (1 - y_true) * 1e12
+
+        # append zeros to represent 1 in formula `log (1+xxxx)`
+        zero_vec = torch.zeros([batch_size*heads, 1], device=y_pred.device)
+        y_pred_neg = torch.cat([y_pred_neg, zero_vec], dim=-1)
+        y_pred_pos = torch.cat([y_pred_pos, zero_vec], dim=-1)
+        neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
+        pos_loss = torch.logsumexp(y_pred_pos, dim=-1)
+        return torch.mean(neg_loss + pos_loss)

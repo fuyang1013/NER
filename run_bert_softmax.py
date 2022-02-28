@@ -69,8 +69,7 @@ if __name__ == '__main__':
     logger.info(f'{arguments}')
 
     # prepare tokenizer
-    tokenizer = BertTokenizerFast(os.path.join(
-        arguments.ptm_dir, 'vocab.txt'))
+    tokenizer = BertTokenizerFast(os.path.join(arguments.ptm_dir, 'vocab.txt'))
     
     # prepare model
     bert = BertModel(BertConfig.from_pretrained(arguments.ptm_dir))

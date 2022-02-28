@@ -2,7 +2,7 @@ import pdb
 import torch
 
 from bert_globalpointer.data_utils import sparse_label_ids
-from bert_globalpointer.gp import GlobalPointer
+from bert_globalpointer.gp import GlobalPointer, GlobalPointerLoss
 
 
 class BertGP(torch.nn.Module):
@@ -53,7 +53,7 @@ class BertGP(torch.nn.Module):
         token_logits = self.globalpointer(token_hidden_states, attention_masks)
         
         if label_ids is not None:
-            label_multihead_matrices = sparse_label_ids(label_ids, self.heads)
+            label_multihead_matrices = sparse_label_ids(label_ids, self.globalpointer.heads)
             loss_fn = GlobalPointerLoss()
             loss = loss_fn(token_logits, label_multihead_matrices)
             return token_logits, loss

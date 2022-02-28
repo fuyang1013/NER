@@ -250,3 +250,10 @@ Namespace(batch_size=32, checkpoint=None, dataset='msra', debug=False, device='c
 
 ### 保持batch_size=32，学习率为2e-5，随机数种子42
 
+### 发现没有加载bert参数！！！fuck！！！
+
+### 一切正常了
+
+### 接下来看看在cluener上的成绩
+
+# globalpointer的成绩95.58%，没有softmax 95.65%好，尝试改下学习率看看

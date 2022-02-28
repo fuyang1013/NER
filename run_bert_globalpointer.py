@@ -1,9 +1,13 @@
 from argparse import ArgumentParser
 import json
+import os
 import torch
 from transformers import BertModel, BertConfig, BertTokenizerFast
 
 from bert_globalpointer.model import BertGP
+from bert_globalpointer.train import handle_train
+from bert_globalpointer.eval import handle_eval
+from bert_globalpointer.predict import handle_predict
 from log import logger
 
 def set_seed(seed):
@@ -61,14 +65,26 @@ if __name__ == '__main__':
     logger.info(f'{arguments}')
 
     # prepare tokenizer
-    tokenizer = BertTokenizerFast(os.path.join(
-        arguments.ptm_dir, 'vocab.txt'))
+    tokenizer = BertTokenizerFast(os.path.join(arguments.ptm_dir, 'vocab.txt'))
     
     # prepare model
     bert = BertModel(BertConfig.from_pretrained(arguments.ptm_dir))
-    model = BertGP(len(arguments.labels), bert)
+    if arguments.do_train:
+        model = BertGP(len(arguments.labels), bert, arguments.train_max_len)
+    else:
+        model = BertGP(len(arguments.labels), bert, arguments.eval_max_len)
+
     if arguments.checkpoint is None:
         bert = BertModel.from_pretrained(arguments.ptm_dir)
         model.ptm_model = bert  # !!!
     else:
         model.load_state_dict(torch.load(arguments.checkpoint))
+    
+    if arguments.do_train:
+        handle_train(model, arguments, tokenizer)
+    elif arguments.do_eval:
+        handle_eval(arguments)
+    elif arguments.do_predict:
+        handle_predict(arguments)
+    else:
+        raise ValueError('unknown task')
